@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>Executive Sales Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #F4F6FB;
+  --white:  #FFFFFF;
+  --border: #E2E8F0;
+  --navy:   #1E3A5F;
+  --blue:   #2563EB;
+  --green:  #059669;
+  --amber:  #B45309;
+  --red:    #DC2626;
+  --purple: #7C3AED;
+  --text:   #111827;
+  --sub:    #6B7280;
+  --muted:  #9CA3AF;
+  --nav-h:  56px;
+  --bot-h:  60px;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  -webkit-text-size-adjust: 100%;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #EEF2F7; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+/* ── TOP NAV ─────────────────────────────────────── */
+#topnav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: var(--navy);
+  height: var(--nav-h);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.nav-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nav-dots { display: flex; gap: 4px; flex-shrink: 0; }
+.nav-dot { width: 7px; height: 7px; border-radius: 50%; }
+.nav-title { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-meta { color: #93C5FD; font-size: 11px; border-left: 1px solid #2D5A8A; padding-left: 12px; white-space: nowrap; }
+
+/* Desktop tab nav inside top bar */
+.nav-tabs { display: flex; }
+.tab-btn {
+  font-size: 13px; padding: 10px 18px; border: none; background: transparent;
+  color: #93C5FD; cursor: pointer; font-family: inherit;
+  border-bottom: 2px solid transparent; transition: all .15s; font-weight: 500;
+}
+.tab-btn:hover { color: #fff; }
+.tab-btn.active { color: #fff; border-bottom-color: #60A5FA; }
+
+/* Filter toggle button (mobile) */
+#filter-toggle {
+  display: none;
+  background: rgba(255,255,255,.12); border: none; color: #fff;
+  padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-family: inherit; align-items: center; gap: 6px;
+  white-space: nowrap; flex-shrink: 0;
+}
+#filter-toggle svg { flex-shrink: 0; }
+
+/* ── BODY LAYOUT ─────────────────────────────────── */
+#layout {
+  display: flex;
+  padding-top: var(--nav-h);
+  min-height: 100%;
+}
+
+/* ── SIDEBAR ─────────────────────────────────────── */
+#sidebar {
+  width: 185px; flex-shrink: 0;
+  background: var(--white); border-right: 1px solid var(--border);
+  padding: 18px 12px;
+  position: sticky; top: var(--nav-h);
+  height: calc(100vh - var(--nav-h));
+  overflow-y: auto;
+}
+.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.sidebar-title { font-size: 11px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: .07em; }
+#clear-btn { font-size: 11px; color: var(--blue); background: none; border: none; cursor: pointer; font-weight: 600; font-family: inherit; display: none; }
+.filter-group { margin-bottom: 16px; }
+.filter-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px; }
+.chip {
+  display: block; width: 100%; text-align: left; font-size: 12px;
+  padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--white); color: var(--sub); cursor: pointer;
+  transition: all .12s; font-family: inherit; margin-bottom: 4px; line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+.chip:hover { border-color: var(--blue); color: var(--blue); background: #EFF6FF; }
+.chip.active { background: #EFF6FF; border-color: var(--blue); color: var(--blue); font-weight: 600; }
+
+/* ── MOBILE FILTER DRAWER ────────────────────────── */
+#drawer-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.45); backdrop-filter: blur(2px);
+}
+#drawer {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 201;
+  background: var(--white); border-radius: 18px 18px 0 0;
+  padding: 0 16px 32px;
+  max-height: 80vh; overflow-y: auto;
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+}
+#drawer.open { transform: translateY(0); }
+#drawer-overlay.open { display: block; }
+.drawer-handle {
+  width: 36px; height: 4px; background: #E2E8F0; border-radius: 2px;
+  margin: 12px auto 16px;
+}
+.drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.drawer-title { font-size: 14px; font-weight: 700; color: var(--navy); }
+#drawer-clear { font-size: 12px; color: var(--blue); background: none; border: none; cursor: pointer; font-weight: 600; font-family: inherit; }
+/* Horizontal chip groups in drawer */
+.drawer-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.drawer-chips .chip { width: auto; display: inline-block; }
+
+/* ── MAIN CONTENT ────────────────────────────────── */
+#main {
+  flex: 1; min-width: 0;
+  padding: 20px 20px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ── KPI GRID ────────────────────────────────────── */
+#kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.kpi-card {
+  background: var(--white); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.kpi-label { font-size: 10px; font-weight: 500; color: var(--sub); letter-spacing: .03em; text-transform: uppercase; line-height: 1.3; }
+.kpi-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.kpi-sub { font-size: 10px; color: var(--muted); }
+
+/* ── VIEWS ───────────────────────────────────────── */
+.view { display: none; flex-direction: column; gap: 16px; }
+.view.active { display: flex; }
+
+/* ── CARDS ───────────────────────────────────────── */
+.card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.card-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+.card-sub { font-size: 12px; color: var(--sub); margin-bottom: 14px; }
+
+/* ── GRIDS ───────────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+/* ── BAR ROWS ────────────────────────────────────── */
+.bar-row { margin-bottom: 12px; }
+.bar-row-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.bar-track { height: 7px; background: #F1F5F9; border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+
+/* ── CHART HEADER ────────────────────────────────── */
+.chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+.chart-header-right { display: flex; gap: 8px; flex-wrap: wrap; }
+.tag { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+
+/* ── LEGEND ──────────────────────────────────────── */
+.legend { display: flex; gap: 14px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--sub); }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── METRIC TOGGLE ───────────────────────────────── */
+.metric-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+.metric-btn {
+  font-size: 12px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--white); color: var(--sub); cursor: pointer; font-weight: 400;
+  font-family: inherit; transition: all .12s; -webkit-tap-highlight-color: transparent;
+}
+.metric-btn.active { border-color: var(--blue); background: #EFF6FF; color: var(--blue); font-weight: 600; }
+
+/* ── COUNTRY CARDS ───────────────────────────────── */
+.country-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.country-card-name { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.country-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-label { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.stat-value { font-size: 15px; font-weight: 700; margin-top: 2px; }
+
+/* ── SUBCAT ROWS ─────────────────────────────────── */
+.subcat-row { margin-bottom: 10px; }
+.subcat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 12px; }
+.subcat-left { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.subcat-rank { color: var(--muted); font-size: 10px; min-width: 16px; }
+.subcat-name { font-weight: 500; }
+.subcat-cat { font-size: 10px; color: var(--muted); }
+.low-badge { font-size: 10px; background: #FEF2F2; color: var(--red); padding: 1px 6px; border-radius: 10px; font-weight: 700; }
+.subcat-bar-track { height: 5px; background: #F1F5F9; border-radius: 3px; overflow: hidden; }
+.subcat-bar-fill { height: 100%; border-radius: 3px; opacity: .85; transition: width .4s; }
+
+/* ── CAT PANELS ──────────────────────────────────── */
+.cat-panel { background: #F8FAFC; border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+.cat-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 6px; }
+.cat-panel-name { font-weight: 700; font-size: 14px; }
+.cat-stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.cat-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.cat-stat-value { font-size: 14px; font-weight: 700; color: var(--text); margin-top: 2px; }
+.margin-track { height: 6px; background: #E2E8F0; border-radius: 3px; overflow: hidden; }
+.margin-fill { height: 100%; border-radius: 3px; }
+
+/* ── INSIGHT BOX ─────────────────────────────────── */
+.insight-box {
+  background: var(--white); border: 1px solid var(--border);
+  border-left: 4px solid var(--blue); border-radius: 8px; padding: 14px 18px;
+}
+.insight-label { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.insight-text { font-size: 13px; line-height: 1.8; color: #374151; }
+
+/* ── CALLOUT ─────────────────────────────────────── */
+.callout { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 12px 14px; font-size: 12px; color: #1E40AF; line-height: 1.6; }
+
+/* ── BOTTOM NAV (mobile only) ────────────────────── */
+#bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: var(--white); border-top: 1px solid var(--border);
+  height: var(--bot-h);
+  box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+}
+.bot-tabs { display: flex; height: 100%; }
+.bot-tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; border: none; background: transparent; color: var(--muted);
+  cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 500;
+  transition: color .15s; -webkit-tap-highlight-color: transparent;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bot-tab svg { width: 20px; height: 20px; }
+.bot-tab.active { color: var(--blue); }
+.bot-tab.active svg path, .bot-tab.active svg rect, .bot-tab.active svg circle { stroke: var(--blue); }
+
+/* ── CHART WRAP ──────────────────────────────────── */
+.chart-wrap { position: relative; }
+
+/* ══════════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS
+══════════════════════════════════════════════════ */
+
+/* Tablet: ≤ 900px */
+@media (max-width: 900px) {
+  .nav-meta { display: none; }
+  #kpi-row { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Mobile: ≤ 640px */
+@media (max-width: 640px) {
+  /* Show mobile UI */
+  #filter-toggle { display: flex; }
+  .nav-tabs { display: none; }
+  #bottom-nav { display: block; }
+  #sidebar { display: none; }
+
+  /* Account for bottom nav */
+  #main { padding-bottom: calc(var(--bot-h) + 20px); }
+
+  /* Nav */
+  #topnav { padding: 0 14px; gap: 10px; }
+  .nav-title { font-size: 13px; }
+
+  /* KPIs: 2 columns on mobile */
+  #kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .kpi-card { padding: 12px; }
+  .kpi-value { font-size: 18px; }
+
+  /* Cards */
+  .card { padding: 14px; }
+  .card-title { font-size: 13px; }
+
+  /* Grids collapse to 1 col */
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+
+  /* Chart header stack vertically */
+  .chart-header { flex-direction: column; align-items: flex-start; }
+  .chart-header-right { width: 100%; }
+
+  /* Tags wrap */
+  .tag { font-size: 10px; padding: 2px 8px; }
+
+  /* Country cards: 1 col */
+  .grid-3.countries { grid-template-columns: 1fr; }
+
+  /* Metric toggle full width */
+  .metric-toggle { width: 100%; }
+  .metric-btn { flex: 1; text-align: center; padding: 6px 4px; font-size: 11px; }
+
+  /* Cat stats 2 col on mobile */
+  .cat-stats-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Main padding */
+  #main { padding: 12px 12px calc(var(--bot-h) + 16px); gap: 12px; }
+}
+
+/* Very small: ≤ 380px */
+@media (max-width: 380px) {
+  #kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .kpi-value { font-size: 16px; }
+  .grid-3 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav id="topnav">
+  <div class="nav-brand">
+    <div class="nav-dots">
+      <div class="nav-dot" style="background:#60A5FA"></div>
+      <div class="nav-dot" style="background:#34D399"></div>
+      <div class="nav-dot" style="background:#FBBF24"></div>
+    </div>
+    <span class="nav-title">Executive Sales Dashboard</span>
+    <span class="nav-meta">2011–2016 &nbsp;·&nbsp; 113,036 transactions &nbsp;·&nbsp; 6 regions</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <!-- Mobile filter button -->
+    <button id="filter-toggle" onclick="openDrawer()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+      Filters <span id="filter-count" style="background:#60A5FA;color:#1E3A5F;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;display:none">0</span>
+    </button>
+    <!-- Desktop tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchView('overview',this)">Overview</button>
+      <button class="tab-btn" onclick="switchView('regional',this)">Regional</button>
+      <button class="tab-btn" onclick="switchView('products',this)">Products</button>
+    </div>
+  </div>
+</nav>
+
+<!-- MOBILE FILTER DRAWER -->
+<div id="drawer-overlay" onclick="closeDrawer()"></div>
+<div id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <span class="drawer-title">🔽 Filter Data</span>
+    <button id="drawer-clear" onclick="clearFilters()" style="display:none">Clear all</button>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Year</div>
+    <div class="drawer-chips" id="df-years"></div>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Country</div>
+    <div class="drawer-chips" id="df-countries"></div>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Category</div>
+    <div class="drawer-chips" id="df-categories"></div>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Age Group</div>
+    <div class="drawer-chips" id="df-ageGroups"></div>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Gender</div>
+    <div class="drawer-chips" id="df-genders"></div>
+  </div>
+  <button onclick="closeDrawer()" style="width:100%;padding:12px;background:var(--navy);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px">Apply Filters</button>
+</div>
+
+<!-- BODY -->
+<div id="layout">
+
+  <!-- DESKTOP SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">Filters</span>
+      <button id="clear-btn" onclick="clearFilters()">Clear all</button>
+    </div>
+    <div class="filter-group"><div class="filter-label">Year</div><div id="f-years"></div></div>
+    <div class="filter-group"><div class="filter-label">Country</div><div id="f-countries"></div></div>
+    <div class="filter-group"><div class="filter-label">Category</div><div id="f-categories"></div></div>
+    <div class="filter-group"><div class="filter-label">Age Group</div><div id="f-ageGroups"></div></div>
+    <div class="filter-group"><div class="filter-label">Gender</div><div id="f-genders"></div></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main id="main">
+
+    <!-- KPI CARDS -->
+    <div id="kpi-row">
+      <div class="kpi-card" style="border-top:3px solid #2563EB">
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value" id="kpi-rev" style="color:#2563EB">—</div>
+      </div>
+      <div class="kpi-card" style="border-top:3px solid #059669">
+        <div class="kpi-label">Total Profit</div>
+        <div class="kpi-value" id="kpi-prof" style="color:#059669">—</div>
+      </div>
+      <div class="kpi-card" style="border-top:3px solid #7C3AED">
+        <div class="kpi-label">Profit Margin</div>
+        <div class="kpi-value" id="kpi-margin" style="color:#7C3AED">—</div>
+        <div class="kpi-sub">profit / revenue</div>
+      </div>
+      <div class="kpi-card" style="border-top:3px solid #1E3A5F">
+        <div class="kpi-label">Total Orders</div>
+        <div class="kpi-value" id="kpi-orders" style="color:#1E3A5F">—</div>
+        <div class="kpi-sub">transactions</div>
+      </div>
+      <div class="kpi-card" style="border-top:3px solid #B45309">
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value" id="kpi-aov" style="color:#B45309">—</div>
+      </div>
+      <div class="kpi-card" style="border-top:3px solid #059669">
+        <div class="kpi-label">YoY Growth</div>
+        <div class="kpi-value" id="kpi-yoy" style="color:#059669">—</div>
+        <div class="kpi-sub" id="kpi-yoy-sub">latest vs prior year</div>
+      </div>
+    </div>
+
+    <!-- OVERVIEW VIEW -->
+    <div id="view-overview" class="view active">
+      <div class="card">
+        <div class="chart-header">
+          <div>
+            <div class="card-title">Revenue &amp; Profit — Year over Year</div>
+            <div class="card-sub" style="margin-bottom:0">Annual performance 2011–2016 with YoY growth rates</div>
+          </div>
+          <div class="chart-header-right" id="yoy-tags"></div>
+        </div>
+        <div class="chart-wrap" style="height:200px"><canvas id="yoy-chart"></canvas></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#1D4ED8"></div>Revenue (peak)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#BFDBFE"></div>Revenue</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#6EE7B7"></div>Profit</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Revenue by Region</div>
+          <div class="card-sub">Share of total revenue per country</div>
+          <div id="country-bars"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Category Profitability</div>
+          <div class="card-sub">Revenue share &amp; margin by category</div>
+          <div id="cat-bars"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REGIONAL VIEW -->
+    <div id="view-regional" class="view">
+      <div class="card">
+        <div class="chart-header">
+          <div>
+            <div class="card-title">Regional Performance</div>
+            <div class="card-sub" style="margin-bottom:0">Compare countries by revenue, profit, or margin</div>
+          </div>
+          <div class="metric-toggle">
+            <button class="metric-btn active" onclick="setMetric('revenue',this)">Revenue</button>
+            <button class="metric-btn" onclick="setMetric('profit',this)">Profit</button>
+            <button class="metric-btn" onclick="setMetric('margin',this)">Margin %</button>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:230px"><canvas id="regional-chart"></canvas></div>
+      </div>
+      <div class="grid-3 countries" id="country-cards"></div>
+    </div>
+
+    <!-- PRODUCTS VIEW -->
+    <div id="view-products" class="view">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Sub-Category Margins</div>
+          <div class="card-sub">Ranked highest to lowest · low performers flagged</div>
+          <div id="subcat-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Category Revenue vs Margin</div>
+          <div class="card-sub">Volume vs profitability</div>
+          <div id="cat-panels"></div>
+          <div class="callout"><strong>💡 Insight:</strong> Accessories generate 58.6% margins vs Bikes at 33.2%. Prioritising Accessories in marketing can improve profitability without increasing order volumes.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KEY FINDINGS -->
+    <div class="insight-box">
+      <div class="insight-label">Key Findings</div>
+      <p class="insight-text">
+        The <strong>United States</strong> leads all regions with 32.8% of total revenue ($28.0M), followed by Australia at 25.0%.
+        YoY revenue growth peaked in <strong>2015 at +41.5%</strong>, then declined 11.5% in 2016 — warranting investigation into market saturation.
+        <strong>Accessories</strong> deliver 58.6% profit margins, nearly double Bikes (33.2%), representing a high-value upsell opportunity.
+        The <strong>Adults 35–64</strong> segment drives ~50% of all revenue; Seniors (64+) remain underpenetrated at under 0.4%.
+        Caps (14.2%) and Jerseys (14.7%) are the lowest-margin sub-categories and warrant pricing review.
+      </p>
+    </div>
+
+  </main>
+</div>
+
+<!-- BOTTOM NAV (mobile only) -->
+<nav id="bottom-nav">
+  <div class="bot-tabs">
+    <button class="bot-tab active" onclick="switchView('overview',this)" id="bot-overview">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Overview
+    </button>
+    <button class="bot-tab" onclick="switchView('regional',this)" id="bot-regional">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a14 14 0 0 1 0 18M3 12h18M4.2 7h15.6M4.2 17h15.6"/></svg>
+      Regional
+    </button>
+    <button class="bot-tab" onclick="switchView('products',this)" id="bot-products">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" stroke-linecap="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14l7 7M21 14l-7 7"/></svg>
+      Products
+    </button>
+  </div>
+</nav>
+
+<script>
+// ═══════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════
+function generateDetailed() {
+  const years=["2011","2012","2013","2014","2015","2016"],yearW=[0.105,0.108,0.179,0.166,0.235,0.208];
+  const countries=["United States","Australia","United Kingdom","Germany","France","Canada"],cRevW=[0.328,0.250,0.125,0.105,0.099,0.093],cProfW=[0.299,0.183,0.119,0.091,0.078,0.100];
+  const cats=["Bikes","Accessories","Clothing"],catRevW=[0.724,0.177,0.098],catProfW=[0.554,0.239,0.077];
+  const ages=["Youth (<25)","Young Adults (25-34)","Adults (35-64)","Seniors (64+)"],ageW=[0.137,0.359,0.499,0.004];
+  const gens=["M","F"],genW=[0.508,0.492];
+  const TR=85270008,TP=32220100,TO=113036,rows=[];
+  for(let yi=0;yi<years.length;yi++)
+    for(let ci=0;ci<countries.length;ci++)
+      for(let cati=0;cati<cats.length;cati++)
+        for(let ai=0;ai<ages.length;ai++)
+          for(let gi=0;gi<gens.length;gi++){
+            const w=yearW[yi]*cRevW[ci]*catRevW[cati]*ageW[ai]*genW[gi];
+            const wp=yearW[yi]*cProfW[ci]*catProfW[cati]*ageW[ai]*genW[gi];
+            rows.push({year:years[yi],country:countries[ci],category:cats[cati],ageGroup:ages[ai],gender:gens[gi],revenue:Math.round(TR*w),profit:Math.round(TP*wp),orders:Math.round(TO*w)});
+          }
+  return rows;
+}
+const DETAILED=generateDetailed();
+const SUBS=[
+  {name:"Road Bikes",cat:"Bikes",revenue:33363061,profit:10078875},
+  {name:"Mountain Bikes",cat:"Bikes",revenue:21123526,profit:8160463},
+  {name:"Touring Bikes",cat:"Bikes",revenue:7295547,profit:2279938},
+  {name:"Helmets",cat:"Accessories",revenue:5741081,profit:3380203},
+  {name:"Tires & Tubes",cat:"Accessories",revenue:4670902,profit:2727713},
+  {name:"Shorts",cat:"Clothing",revenue:1740710,profit:1034342},
+  {name:"Bottles & Cages",cat:"Accessories",revenue:1409174,profit:810598},
+  {name:"Fenders",cat:"Accessories",revenue:1245733,profit:748914},
+  {name:"Hydration Packs",cat:"Accessories",revenue:990406,profit:572668},
+  {name:"Vests",cat:"Clothing",revenue:949063,profit:518791},
+  {name:"Gloves",cat:"Clothing",revenue:871419,profit:511654},
+  {name:"Bike Racks",cat:"Accessories",revenue:517800,profit:304455},
+  {name:"Bike Stands",cat:"Accessories",revenue:344075,profit:201935},
+  {name:"Jerseys",cat:"Clothing",revenue:4113742,profit:603568},
+  {name:"Caps",cat:"Clothing",revenue:548777,profit:77921},
+  {name:"Cleaners",cat:"Accessories",revenue:198821,profit:115891},
+  {name:"Socks",cat:"Clothing",revenue:147171,profit:93171},
+];
+const CAT_BASE={Bikes:61782134,Accessories:15117992,Clothing:8370882};
+
+// ═══════════════════════════════════════════════════
+// FORMATTERS
+// ═══════════════════════════════════════════════════
+const fmtS=n=>{if(n==null||isNaN(n))return"—";const a=Math.abs(n);if(a>=1e6)return`$${(n/1e6).toFixed(1)}M`;if(a>=1e3)return`$${(n/1e3).toFixed(1)}K`;return`$${n.toFixed(0)}`;};
+const fmtN=n=>Math.round(n).toLocaleString("en-US");
+const fmtP=n=>`${n>0?"+":""}${n.toFixed(1)}%`;
+
+// ═══════════════════════════════════════════════════
+// COLORS
+// ═══════════════════════════════════════════════════
+const CC={"United States":"#2563EB","Australia":"#059669","United Kingdom":"#7C3AED","Germany":"#D97706","France":"#DC2626","Canada":"#0891B2"};
+const CAT_COL={Bikes:"#2563EB",Accessories:"#059669",Clothing:"#D97706"};
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+const filters={years:[],countries:[],categories:[],ageGroups:[],genders:[]};
+let activeMetric="revenue",yoyChart=null,regionalChart=null,currentView="overview";
+
+// ═══════════════════════════════════════════════════
+// DRAWER
+// ═══════════════════════════════════════════════════
+function openDrawer(){
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeDrawer(){
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+// ═══════════════════════════════════════════════════
+// BUILD CHIPS
+// ═══════════════════════════════════════════════════
+function buildChips(){
+  const groups=[
+    {key:"years",      ids:["f-years","df-years"],      opts:["2011","2012","2013","2014","2015","2016"]},
+    {key:"countries",  ids:["f-countries","df-countries"],  opts:["United States","Australia","United Kingdom","Germany","France","Canada"]},
+    {key:"categories", ids:["f-categories","df-categories"], opts:["Bikes","Accessories","Clothing"]},
+    {key:"ageGroups",  ids:["f-ageGroups","df-ageGroups"],  opts:["Youth (<25)","Young Adults (25-34)","Adults (35-64)","Seniors (64+)"]},
+    {key:"genders",    ids:["f-genders","df-genders"],    opts:["M","F"]},
+  ];
+  groups.forEach(({key,ids,opts})=>{
+    ids.forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el) return;
+      el.innerHTML=opts.map(o=>`<button class="chip" data-key="${key}" data-val="${o}" onclick="toggleFilter('${key}','${o}')">${o}</button>`).join('');
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// FILTER LOGIC
+// ═══════════════════════════════════════════════════
+function toggleFilter(key,val){
+  const idx=filters[key].indexOf(val);
+  if(idx===-1) filters[key].push(val);
+  else filters[key].splice(idx,1);
+  // Sync all chips with same key+val
+  document.querySelectorAll(`.chip[data-key="${key}"][data-val="${val}"]`).forEach(b=>{
+    b.classList.toggle('active', filters[key].includes(val));
+  });
+  updateFilterUI();
+  render();
+}
+
+function updateFilterUI(){
+  const total=Object.values(filters).reduce((s,a)=>s+a.length,0);
+  const hasF=total>0;
+  // Desktop
+  const cb=document.getElementById('clear-btn');
+  if(cb) cb.style.display=hasF?'block':'none';
+  // Drawer
+  const dc=document.getElementById('drawer-clear');
+  if(dc) dc.style.display=hasF?'block':'none';
+  // Filter badge
+  const fc=document.getElementById('filter-count');
+  if(fc){ fc.textContent=total; fc.style.display=total?'inline':'none'; }
+}
+
+function clearFilters(){
+  Object.keys(filters).forEach(k=>filters[k]=[]);
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  updateFilterUI();
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+// COMPUTE
+// ═══════════════════════════════════════════════════
+function getFiltered(){
+  return DETAILED.filter(r=>
+    (!filters.years.length      ||filters.years.includes(r.year))&&
+    (!filters.countries.length  ||filters.countries.includes(r.country))&&
+    (!filters.categories.length ||filters.categories.includes(r.category))&&
+    (!filters.ageGroups.length  ||filters.ageGroups.includes(r.ageGroup))&&
+    (!filters.genders.length    ||filters.genders.includes(r.gender))
+  );
+}
+function computeKpi(rows){
+  const rev=rows.reduce((s,r)=>s+r.revenue,0),prof=rows.reduce((s,r)=>s+r.profit,0),ord=rows.reduce((s,r)=>s+r.orders,0);
+  const yAgg={};rows.forEach(r=>{yAgg[r.year]=(yAgg[r.year]||0)+r.revenue;});
+  const yrs=Object.keys(yAgg).sort();let yoy=null;
+  if(yrs.length>=2){const last=yAgg[yrs[yrs.length-1]]||0,prev=yAgg[yrs[yrs.length-2]]||0;if(prev>0)yoy=(last-prev)/prev*100;}
+  return{rev,prof,margin:rev?prof/rev*100:0,ord,aov:ord?rev/ord:0,yoy};
+}
+function computeYoy(rows){
+  const agg={};rows.forEach(r=>{if(!agg[r.year])agg[r.year]={r:0,p:0};agg[r.year].r+=r.revenue;agg[r.year].p+=r.profit;});
+  return["2011","2012","2013","2014","2015","2016"].filter(y=>agg[y]).map((y,i,arr)=>{
+    const cur=agg[y],prev=i>0?agg[arr[i-1]]:null;
+    const yoy=prev&&prev.r?(cur.r-prev.r)/prev.r*100:null;
+    return{year:y,revenue:cur.r,profit:cur.p,yoy,margin:cur.r?cur.p/cur.r*100:0};
+  });
+}
+function computeCountries(rows){
+  const agg={};rows.forEach(r=>{if(!agg[r.country])agg[r.country]={r:0,p:0};agg[r.country].r+=r.revenue;agg[r.country].p+=r.profit;});
+  const tot=Object.values(agg).reduce((s,v)=>s+v.r,0);
+  return Object.entries(agg).sort((a,b)=>b[1].r-a[1].r).map(([name,v])=>({name,revenue:v.r,profit:v.p,share:tot?v.r/tot*100:0,margin:v.r?v.p/v.r*100:0}));
+}
+function computeCats(rows){
+  const agg={};rows.forEach(r=>{if(!agg[r.category])agg[r.category]={r:0,p:0};agg[r.category].r+=r.revenue;agg[r.category].p+=r.profit;});
+  const tot=Object.values(agg).reduce((s,v)=>s+v.r,0);
+  const active=Object.keys(agg);
+  const subs=SUBS.filter(s=>!active.length||active.includes(s.cat)).map(s=>{
+    const scale=(agg[s.cat]?.r||0)/(CAT_BASE[s.cat]||1);
+    return{...s,revenue:Math.round(s.revenue*scale),profit:Math.round(s.profit*scale),margin:s.revenue?s.profit/s.revenue*100:0};
+  }).sort((a,b)=>b.margin-a.margin);
+  const list=Object.entries(agg).map(([n,v])=>({name:n,revenue:v.r,profit:v.p,margin:v.r?v.p/v.r*100:0,share:tot?v.r/tot*100:0})).sort((a,b)=>b.revenue-a.revenue);
+  return{list,subs};
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER KPI
+// ═══════════════════════════════════════════════════
+function renderKpi(kpi){
+  const yoyEl=document.getElementById('kpi-yoy');
+  const yoyCol=kpi.yoy!=null&&kpi.yoy<0?'#DC2626':'#059669';
+  document.getElementById('kpi-rev').textContent=fmtS(kpi.rev);
+  document.getElementById('kpi-prof').textContent=fmtS(kpi.prof);
+  document.getElementById('kpi-margin').textContent=`${kpi.margin.toFixed(1)}%`;
+  document.getElementById('kpi-orders').textContent=fmtN(kpi.ord);
+  document.getElementById('kpi-aov').textContent=fmtS(kpi.aov);
+  yoyEl.textContent=kpi.yoy!=null?fmtP(kpi.yoy):'N/A';
+  yoyEl.style.color=yoyCol;
+  yoyEl.closest('.kpi-card').style.borderTopColor=yoyCol;
+  document.getElementById('kpi-yoy-sub').textContent=kpi.yoy!=null?'latest vs prior year':'Select 2+ years';
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER YOY CHART
+// ═══════════════════════════════════════════════════
+function renderYoyChart(yoyData){
+  if(!yoyData.length) return;
+  const bestIdx=yoyData.reduce((bi,d,i)=>d.revenue>yoyData[bi].revenue?i:bi,0);
+  const revColors=yoyData.map((_,i)=>i===bestIdx?'#1D4ED8':'#BFDBFE');
+  const tagsEl=document.getElementById('yoy-tags');
+  const best=yoyData[bestIdx];
+  const wg=yoyData.filter(d=>d.yoy!=null);
+  const worst=wg.length?wg.reduce((a,b)=>a.yoy<b.yoy?a:b):null;
+  tagsEl.innerHTML=(best?`<span class="tag" style="background:#EFF6FF;color:#2563EB">Peak: ${best.year} · ${fmtS(best.revenue)}</span>`:'')+
+    (worst?`<span class="tag" style="background:#FEF2F2;color:#DC2626">Worst YoY: ${worst.year} · ${fmtP(worst.yoy)}</span>`:'');
+  if(yoyChart) yoyChart.destroy();
+  const ctx=document.getElementById('yoy-chart').getContext('2d');
+  const yoys=yoyData.map(d=>d.yoy);
+  yoyChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:yoyData.map(d=>d.year),datasets:[
+      {label:'Revenue',data:yoyData.map(d=>d.revenue),backgroundColor:revColors,borderRadius:4,borderSkipped:false,maxBarThickness:46},
+      {label:'Profit', data:yoyData.map(d=>d.profit), backgroundColor:'#6EE7B7',borderRadius:4,borderSkipped:false,maxBarThickness:46},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1E3A5F',titleColor:'#93C5FD',bodyColor:'#F1F5F9',
+        callbacks:{label:item=>` ${item.dataset.label}: ${fmtS(item.raw)}`,
+          afterBody:items=>{const d=yoyData[items[0].dataIndex];const l=[`Margin: ${d.margin.toFixed(1)}%`];if(d.yoy!=null)l.push(`YoY: ${fmtP(d.yoy)}`);return l;}}}},
+      scales:{
+        x:{grid:{display:false},ticks:{color:'#6B7280',font:{size:11}}},
+        y:{grid:{color:'#F1F5F9'},border:{dash:[3,3]},ticks:{color:'#9CA3AF',font:{size:10},callback:v=>fmtS(v)}}
+      },animation:{duration:350}
+    },
+    plugins:[{id:'yoyLbls',afterDatasetsDraw(chart){
+      const {ctx}=chart;ctx.save();ctx.font='10px Inter,sans-serif';ctx.fillStyle='#6B7280';ctx.textAlign='center';
+      yoys.forEach((v,i)=>{if(v==null)return;const b=chart.getDatasetMeta(0).data[i];ctx.fillText(fmtP(v),b.x,b.y-5);});
+      ctx.restore();
+    }}]
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER COUNTRY BARS
+// ═══════════════════════════════════════════════════
+function renderCountryBars(countries){
+  document.getElementById('country-bars').innerHTML=countries.map(c=>`
+    <div class="bar-row">
+      <div class="bar-row-header">
+        <span style="color:${CC[c.name]||'#2563EB'};font-weight:600">${c.name}</span>
+        <span style="color:#6B7280">${fmtS(c.revenue)}&nbsp;<strong style="color:#111827">${c.share.toFixed(1)}%</strong></span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${c.share}%;background:${CC[c.name]||'#2563EB'}"></div></div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER CAT BARS
+// ═══════════════════════════════════════════════════
+function renderCatBars(cats){
+  document.getElementById('cat-bars').innerHTML=cats.list.map(c=>`
+    <div style="margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:6px">
+        <span style="font-weight:700;color:${CAT_COL[c.name]}">${c.name}</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="color:#6B7280">${fmtS(c.revenue)}</span>
+          <span style="font-size:11px;background:${CAT_COL[c.name]}20;color:${CAT_COL[c.name]};padding:2px 8px;border-radius:20px;font-weight:600">${c.margin.toFixed(1)}% margin</span>
+        </div>
+      </div>
+      <div class="bar-track" style="height:8px"><div class="bar-fill" style="width:${c.share}%;background:${CAT_COL[c.name]}"></div></div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:3px">Share: ${c.share.toFixed(1)}% · Profit: ${fmtS(c.profit)}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER REGIONAL CHART
+// ═══════════════════════════════════════════════════
+function renderRegionalChart(countries){
+  if(!countries.length) return;
+  const sorted=[...countries].sort((a,b)=>b[activeMetric]-a[activeMetric]);
+  if(regionalChart) regionalChart.destroy();
+  const ctx=document.getElementById('regional-chart').getContext('2d');
+  regionalChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:sorted.map(c=>c.name),datasets:[{data:sorted.map(c=>c[activeMetric]),backgroundColor:sorted.map(c=>CC[c.name]||'#2563EB'),borderRadius:4,borderSkipped:false,maxBarThickness:26}]},
+    options:{
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1E3A5F',titleColor:'#93C5FD',bodyColor:'#F1F5F9',
+        callbacks:{title:items=>items[0].label,label:item=>{const c=sorted[item.dataIndex];return[` Revenue: ${fmtS(c.revenue)}`,' Profit: '+fmtS(c.profit),` Margin: ${c.margin.toFixed(1)}%`,` Share: ${c.share.toFixed(1)}%`];}}}},
+      scales:{
+        x:{grid:{color:'#F1F5F9'},border:{dash:[3,3]},ticks:{color:'#9CA3AF',font:{size:10},callback:v=>activeMetric==='margin'?`${v.toFixed(0)}%`:fmtS(v)}},
+        y:{grid:{display:false},ticks:{color:'#111827',font:{size:11}}}
+      },animation:{duration:350}
+    },
+    plugins:[{id:'endLbls',afterDatasetsDraw(chart){
+      const{ctx}=chart;ctx.save();ctx.font='10px Inter,sans-serif';ctx.fillStyle='#6B7280';ctx.textAlign='left';
+      sorted.forEach((c,i)=>{const b=chart.getDatasetMeta(0).data[i];const v=activeMetric==='margin'?`${c.margin.toFixed(1)}%`:fmtS(c[activeMetric]);ctx.fillText(v,b.x+4,b.y+4);});
+      ctx.restore();
+    }}]
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER COUNTRY CARDS
+// ═══════════════════════════════════════════════════
+function renderCountryCards(countries){
+  document.getElementById('country-cards').innerHTML=countries.map(c=>`
+    <div class="country-card" style="border-top:3px solid ${CC[c.name]||'#2563EB'}">
+      <div class="country-card-name" style="color:${CC[c.name]||'#2563EB'}">${c.name}</div>
+      <div class="country-card-grid">
+        <div><div class="stat-label">Revenue</div><div class="stat-value" style="color:#111827">${fmtS(c.revenue)}</div></div>
+        <div><div class="stat-label">Profit</div><div class="stat-value" style="color:#059669">${fmtS(c.profit)}</div></div>
+        <div><div class="stat-label">Margin</div><div class="stat-value" style="color:#7C3AED">${c.margin.toFixed(1)}%</div></div>
+        <div><div class="stat-label">Share</div><div class="stat-value" style="color:#6B7280">${c.share.toFixed(1)}%</div></div>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER SUBCATS
+// ═══════════════════════════════════════════════════
+function renderSubcats(cats){
+  const max=Math.max(...cats.subs.map(d=>d.margin),1);
+  document.getElementById('subcat-list').innerHTML=cats.subs.map((d,i)=>{
+    const low=d.margin<20,col=low?'#DC2626':(CAT_COL[d.cat]||'#2563EB');
+    return`<div class="subcat-row">
+      <div class="subcat-header">
+        <div class="subcat-left">
+          <span class="subcat-rank">#${i+1}</span>
+          <span class="subcat-name">${d.name}</span>
+          <span class="subcat-cat">· ${d.cat}</span>
+          ${low?'<span class="low-badge">LOW</span>':''}
+        </div>
+        <span style="font-weight:700;color:${col}">${d.margin.toFixed(1)}%</span>
+      </div>
+      <div class="subcat-bar-track"><div class="subcat-bar-fill" style="width:${d.margin/max*100}%;background:${low?'#FCA5A5':col}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER CAT PANELS
+// ═══════════════════════════════════════════════════
+function renderCatPanels(cats){
+  document.getElementById('cat-panels').innerHTML=cats.list.map(c=>`
+    <div class="cat-panel">
+      <div class="cat-panel-header">
+        <span class="cat-panel-name" style="color:${CAT_COL[c.name]}">${c.name}</span>
+        <span style="font-size:11px;background:${CAT_COL[c.name]}20;color:${CAT_COL[c.name]};padding:3px 10px;border-radius:20px;font-weight:700">${c.margin.toFixed(1)}% margin</span>
+      </div>
+      <div class="cat-stats-grid">
+        <div><div class="cat-stat-label">Revenue</div><div class="cat-stat-value">${fmtS(c.revenue)}</div></div>
+        <div><div class="cat-stat-label">Profit</div><div class="cat-stat-value">${fmtS(c.profit)}</div></div>
+        <div><div class="cat-stat-label">Rev Share</div><div class="cat-stat-value">${c.share.toFixed(1)}%</div></div>
+      </div>
+      <div class="margin-track"><div class="margin-fill" style="width:${c.margin}%;background:${CAT_COL[c.name]}"></div></div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// VIEW SWITCH
+// ═══════════════════════════════════════════════════
+function switchView(v, btn){
+  currentView=v;
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  // Desktop tab highlight
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===v));
+  // Bottom nav highlight
+  document.querySelectorAll('.bot-tab').forEach(b=>b.classList.remove('active'));
+  const botBtn=document.getElementById('bot-'+v);
+  if(botBtn){
+    botBtn.classList.add('active');
+    botBtn.querySelectorAll('path,rect,circle').forEach(el=>el.setAttribute('stroke','#2563EB'));
+    document.querySelectorAll('.bot-tab:not(.active)').forEach(b=>b.querySelectorAll('path,rect,circle').forEach(el=>el.setAttribute('stroke','#9CA3AF')));
+  }
+  // Re-render the chart for this view
+  const rows=getFiltered();
+  if(v==='overview') renderYoyChart(computeYoy(rows));
+  if(v==='regional') renderRegionalChart(computeCountries(rows));
+}
+
+function setMetric(m,btn){
+  activeMetric=m;
+  document.querySelectorAll('.metric-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+// MAIN RENDER
+// ═══════════════════════════════════════════════════
+function render(){
+  const rows=getFiltered();
+  const kpi=computeKpi(rows),yoyData=computeYoy(rows),countries=computeCountries(rows),cats=computeCats(rows);
+  renderKpi(kpi);
+  renderCountryBars(countries);
+  renderCatBars(cats);
+  renderSubcats(cats);
+  renderCatPanels(cats);
+  renderCountryCards(countries);
+  if(currentView==='overview') renderYoyChart(yoyData);
+  if(currentView==='regional') renderRegionalChart(countries);
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+buildChips();
+render();
+</script>
+</body>
+</html>
